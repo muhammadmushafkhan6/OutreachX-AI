@@ -1,0 +1,37 @@
+# === Core (API chalane ke liye — yeh zaroor install karein) ===
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic-settings==2.7.0
+python-dotenv==1.0.1
+email-validator==2.2.0
+httpx==0.28.1
+slowapi==0.1.9
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+
+# PostgreSQL (async)
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30.0
+apify-client==3.0.2
+
+# HTML parsing (scraper ke liye)
+beautifulsoup4==4.12.3
+lxml>=5.3.0
+
+# Export
+openpyxl==3.1.5
+
+# AI (optional key in .env; fallback works without API calls)
+openai==1.58.1
+
+# Twilio Real Phone Calling
+twilio==9.4.0
+
+# === Optional (baad mein / jab zaroorat ho) ===
+# Redis + Celery: redis==5.2.1  celery==5.4.0
+# Browser scraping: playwright==1.49.1  → phir: playwright install chromium
+# Migrations: alembic==1.14.0

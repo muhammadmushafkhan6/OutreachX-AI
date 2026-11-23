@@ -1,0 +1,196 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 224 71% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 4%;
+    --primary: 80 100% 50%; /* #AAFF00 Lime Green */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 9% 46%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 80 100% 90%;
+    --accent-foreground: 80 100% 20%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 80 100% 50%;
+    --radius: 1.5rem;
+  }
+
+  .dark {
+    --background: 120 50% 2%; /* Deep space forest near black */
+    --foreground: 80 100% 98%;
+    --card: 120 40% 4%;
+    --card-foreground: 80 100% 98%;
+    --primary: 80 100% 50%; /* #AAFF00 Lime Green */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 120 40% 8%;
+    --secondary-foreground: 80 100% 80%;
+    --muted: 120 40% 6%;
+    --muted-foreground: 120 10% 60%;
+    --accent: 80 100% 15%;
+    --accent-foreground: 80 100% 90%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 120 30% 10%;
+    --input: 120 30% 10%;
+    --ring: 80 100% 50%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    overflow-x: hidden;
+  }
+}
+
+@layer utilities {
+  .gradient-text {
+    @apply bg-gradient-to-r from-white via-white to-white/60 bg-clip-text text-transparent;
+  }
+
+  .text-neon-glow {
+    text-shadow: 0 0 10px rgba(170, 255, 0, 0.4), 0 0 20px rgba(170, 255, 0, 0.2);
+  }
+
+  .text-neon-glow-strong {
+    text-shadow: 0 0 12px rgba(170, 255, 0, 0.8), 0 0 30px rgba(170, 255, 0, 0.4), 0 0 50px rgba(170, 255, 0, 0.2);
+  }
+
+  .hero-glow {
+    background: radial-gradient(
+      ellipse 60% 40% at 50% 50%,
+      rgba(170, 255, 0, 0.12) 0%,
+      rgba(170, 255, 0, 0.03) 40%,
+      transparent 75%
+    );
+  }
+
+  .deep-space-glow {
+    background: radial-gradient(
+      circle at top center,
+      rgba(170, 255, 0, 0.08) 0%,
+      transparent 80%
+    );
+  }
+
+  .glass-card {
+    @apply bg-black/40 backdrop-blur-xl border border-white/10;
+  }
+
+  .glass-button {
+    @apply bg-white/5 hover:bg-white/10 border border-white/10 backdrop-blur-md transition-all duration-300;
+  }
+
+  .revex-pill {
+    @apply inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-xs font-medium text-primary;
+  }
+
+  .animate-progress {
+    animation: progress 3s infinite ease-in-out;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-spin-slow {
+    animation: spin 20s linear infinite;
+  }
+
+  .animate-loader {
+    animation: loader-spin 2s linear infinite;
+  }
+
+  @keyframes loader-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes progress {
+    0% { width: 0%; }
+    50% { width: 70%; }
+    100% { width: 100%; }
+  }
+}
+
+/* Map InfoWindow & Popup Styling */
+.leaflet-popup-content-wrapper {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 16px !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: inherit !important;
+}
+
+.leaflet-popup-tip {
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.gm-style .gm-style-iw-c {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.gm-style .gm-style-iw-d {
+  overflow: auto !important;
+  padding: 0 !important;
+}
+
+.gm-style .gm-style-iw-tc::after {
+  background: #0f172a !important;
+}
+
+/* Custom Live Map Marker & Radar Tooltip */
+.city-center-radar {
+  background: transparent !important;
+  border: none !important;
+}
+
+.radar-tooltip {
+  background: #0b101b !important;
+  border: 1.5px solid #AAFF00 !important;
+  color: #fff !important;
+  font-weight: 800 !important;
+  font-size: 11px !important;
+  border-radius: 9999px !important;
+  padding: 4px 10px !important;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.6) !important;
+}
+
+.radar-tooltip::before {
+  border-top-color: #AAFF00 !important;
+}
+
+.saas-pin-container {
+  background: transparent !important;
+  border: none !important;
+}
+
+.saas-map-pin:hover {
+  transform: translate(-50%, -105%) scale(1.08) !important;
+  z-index: 9999 !important;
+}
+
+.city-center-beacon {
+  background: transparent !important;
+  border: none !important;
+}
+
+

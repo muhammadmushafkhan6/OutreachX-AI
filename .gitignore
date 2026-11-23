@@ -1,0 +1,48 @@
+# Virtual Environment & Python
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Environment & Secrets
+.env
+.env.*
+!.env.example
+
+# Database & Local storage
+*.db
+*.sqlite3
+exports/*
+!exports/.gitkeep
+dataflow.sql
+
+# Flutter / Mobile
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/build/
+.gradle/
+
+# WhatsApp Service Session & Cache
+whatsapp-service/.wwebjs_auth/
+whatsapp-service/.wwebjs_cache/
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Logs
+*.log
+*.pem
+*.key
+

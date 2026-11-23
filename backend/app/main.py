@@ -36,27 +36,13 @@ async def lifespan(app: FastAPI):
         settings.postgres_port,
         settings.postgres_db,
     )
+    # 1. Create all base tables first in a clean transaction
     async with engine.begin() as conn:
-        # ── One-time migration: drop linkedin_leads if columns are missing ──
-        # create_all never alters existing tables, so if the table was created
-        # with a different schema we must drop and let it be recreated.
-        try:
-            result = await conn.execute(text(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name = 'linkedin_leads' AND column_name = 'first_name'"
-            ))
-            row = result.fetchone()
-            if row is None:
-                # Table exists but is missing the expected columns — drop it
-                logger.warning(
-                    "linkedin_leads table schema is outdated — dropping and recreating..."
-                )
-                await conn.execute(text("DROP TABLE IF EXISTS linkedin_leads CASCADE"))
-        except Exception as mig_err:
-            logger.warning("linkedin_leads migration check failed (safe to ignore): %s", mig_err)
+        await conn.run_sync(Base.metadata.create_all)
 
-        # ── Ensure map_leads has all new columns ──
-        try:
+    # 2. Schema column additions safely in a separate transaction
+    try:
+        async with engine.begin() as conn:
             columns_to_add = [
                 ("place_id", "VARCHAR(255)"),
                 ("lat", "DOUBLE PRECISION"),
@@ -75,10 +61,9 @@ async def lifespan(app: FastAPI):
                 await conn.execute(text(
                     f"ALTER TABLE map_leads ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
                 ))
-        except Exception as col_err:
-            logger.warning("map_leads migration check (safe to ignore if table doesn't exist yet): %s", col_err)
+    except Exception as col_err:
+        logger.warning("map_leads migration check: %s", col_err)
 
-        await conn.run_sync(Base.metadata.create_all)
     logger.info("Ready (PostgreSQL)")
     yield
     await engine.dispose()

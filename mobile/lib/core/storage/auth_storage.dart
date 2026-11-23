@@ -7,8 +7,8 @@ class AuthStorage {
   static const String _keyUser = 'auth_user';
   static const String _keyBaseUrl = 'api_base_url';
 
-  // Default points to Android Emulator host IP, or Render live URL
-  static const String defaultBaseUrl = 'http://10.0.2.2:8000/api/v1';
+  // Default points to live AWS EC2 backend
+  static const String defaultBaseUrl = 'http://13.211.240.152:8000/api/v1';
 
   static Future<void> saveToken(String token) async {
     final prefs = await SharedPreferences.getInstance();

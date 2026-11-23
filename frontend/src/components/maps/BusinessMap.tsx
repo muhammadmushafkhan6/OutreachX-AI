@@ -21,8 +21,8 @@ interface BusinessMapProps {
 
 type MapFilter = "all" | "high" | "medium" | "low" | "has_website" | "has_email" | "no_website";
 
-// Custom dark map style (matches app theme)
-const DARK_MAP_STYLES: google.maps.MapTypeStyle[] = [
+// Custom dark map style for Google Maps
+const DARK_MAP_STYLES: any[] = [
   { elementType: "geometry", stylers: [{ color: "#0d121c" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#0d121c" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#6b7280" }] },
@@ -41,24 +41,39 @@ const DARK_MAP_STYLES: google.maps.MapTypeStyle[] = [
   { featureType: "administrative.land_parcel", elementType: "labels.text.fill", stylers: [{ color: "#374151" }] },
 ];
 
-// Singleton loader — loads Google Maps JS API only once
-let gmapsPromise: Promise<void> | null = null;
+function loadLeaflet(): Promise<any> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).L) {
+      return resolve((window as any).L);
+    }
+    if (!document.getElementById("leaflet-css")) {
+      const link = document.createElement("link");
+      link.id = "leaflet-css";
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+    }
+    const script = document.createElement("script");
+    script.id = "leaflet-script";
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload = () => resolve((window as any).L);
+    script.onerror = () => reject(new Error("Leaflet failed to load"));
+    document.head.appendChild(script);
+  });
+}
+
 function loadGoogleMapsAPI(apiKey: string): Promise<void> {
-  if (gmapsPromise) return gmapsPromise;
   if (typeof window !== "undefined" && (window as any).google?.maps) {
-    gmapsPromise = Promise.resolve();
-    return gmapsPromise;
+    return Promise.resolve();
   }
-  gmapsPromise = new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const existing = document.getElementById("google-maps-script");
     if (existing) {
-      // Already injected — wait for it
       existing.addEventListener("load", () => resolve());
       return;
     }
     const script = document.createElement("script");
     script.id = "google-maps-script";
-    // No "marker" library — use classic Marker (no mapId required)
     script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
     script.async = true;
     script.defer = true;
@@ -66,7 +81,6 @@ function loadGoogleMapsAPI(apiKey: string): Promise<void> {
     script.onerror = () => reject(new Error("Google Maps failed to load"));
     document.head.appendChild(script);
   });
-  return gmapsPromise;
 }
 
 export function BusinessMap({
@@ -80,20 +94,26 @@ export function BusinessMap({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const [filter, setFilter] = useState<MapFilter>("all");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [mapType, setMapType] = useState<"google" | "leaflet">("leaflet");
   const [mapReady, setMapReady] = useState(false);
   const [mapStyle, setMapStyle] = useState<"dark" | "streets">("dark");
-  const [loadError, setLoadError] = useState(false);
 
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
-  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
+  // Google Maps refs
+  const gmapInstanceRef = useRef<any>(null);
+  const gmarkersRef = useRef<any[]>([]);
+  const ginfoWindowRef = useRef<any>(null);
+
+  // Leaflet refs
+  const lmapInstanceRef = useRef<any>(null);
+  const lmarkersRef = useRef<any[]>([]);
+  const ltileLayerRef = useRef<any>(null);
+
   const lastFittedCountRef = useRef(0);
 
   const [targetCityCoords, setTargetCityCoords] = useState<CityCoord>(() =>
     resolveLocationCoords(city, country)
   );
 
-  // Geocode city when it changes
   useEffect(() => {
     let alive = true;
     if (!city.trim()) return;
@@ -103,7 +123,6 @@ export function BusinessMap({
     return () => { alive = false; };
   }, [city, country]);
 
-  // Filter leads
   const filteredLeads = useMemo(() => {
     return leads.filter((lead) => {
       const score = (lead.lead_score || "HIGH").toUpperCase();
@@ -126,66 +145,7 @@ export function BusinessMap({
     }));
   }, [filteredLeads, targetCityCoords]);
 
-  // Initialize Google Map once
-  useEffect(() => {
-    if (!mapContainerRef.current) return;
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
-
-    loadGoogleMapsAPI(apiKey)
-      .then(() => {
-        if (!mapContainerRef.current) return;
-
-        const map = new window.google.maps.Map(mapContainerRef.current, {
-          center: { lat: targetCityCoords.lat, lng: targetCityCoords.lng },
-          zoom: targetCityCoords.zoom || 13,
-          // No mapId — works with classic Marker, no billing restriction
-          disableDefaultUI: true,
-          zoomControl: true,
-          zoomControlOptions: {
-            position: window.google.maps.ControlPosition.RIGHT_BOTTOM,
-          },
-          styles: DARK_MAP_STYLES,
-          backgroundColor: "#0d121c",
-          gestureHandling: "greedy",
-        });
-
-        infoWindowRef.current = new window.google.maps.InfoWindow({
-          disableAutoPan: false,
-        });
-
-        mapInstanceRef.current = map;
-        setMapReady(true);
-      })
-      .catch(() => setLoadError(true));
-
-    return () => {
-      markersRef.current.forEach((m) => m.setMap(null));
-      markersRef.current = [];
-      mapInstanceRef.current = null;
-      setMapReady(false);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Toggle dark / streets style
-  useEffect(() => {
-    if (!mapReady || !mapInstanceRef.current) return;
-    mapInstanceRef.current.setOptions({
-      styles: mapStyle === "dark" ? DARK_MAP_STYLES : [],
-      mapTypeId: mapStyle === "streets"
-        ? window.google.maps.MapTypeId.ROADMAP
-        : window.google.maps.MapTypeId.ROADMAP,
-    });
-  }, [mapStyle, mapReady]);
-
-  // Update center when city changes and no leads
-  useEffect(() => {
-    if (!mapReady || !mapInstanceRef.current || leads.length > 0) return;
-    mapInstanceRef.current.panTo({ lat: targetCityCoords.lat, lng: targetCityCoords.lng });
-    mapInstanceRef.current.setZoom(targetCityCoords.zoom || 13);
-  }, [targetCityCoords, mapReady, leads.length]);
-
-  // Popup HTML
+  // Popup HTML template
   const createInfoContent = useCallback((lead: MapLead) => {
     const score = (lead.lead_score || "HIGH").toUpperCase();
     const hasWebsite = Boolean(lead.website && lead.website.trim() !== "");
@@ -222,105 +182,277 @@ export function BusinessMap({
     `;
   }, []);
 
-  // Render custom HTML markers (overlay-based, no AdvancedMarker needed)
+  // Initialize Map Engine (Google if valid key, else OpenStreetMap / Leaflet)
   useEffect(() => {
-    if (!mapReady || !mapInstanceRef.current || !window.google?.maps) return;
-    const map = mapInstanceRef.current;
+    if (!mapContainerRef.current) return;
+    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
 
-    // Clear old markers
-    markersRef.current.forEach((m) => m.setMap(null));
-    markersRef.current = [];
+    const initLeaflet = async () => {
+      try {
+        const L = await loadLeaflet();
+        if (!mapContainerRef.current) return;
 
-    if (leadsWithCoords.length === 0) {
-      map.panTo({ lat: targetCityCoords.lat, lng: targetCityCoords.lng });
-      return;
+        // Clear previous Leaflet instance if any
+        if (lmapInstanceRef.current) {
+          lmapInstanceRef.current.remove();
+        }
+
+        const map = L.map(mapContainerRef.current, {
+          center: [targetCityCoords.lat, targetCityCoords.lng],
+          zoom: targetCityCoords.zoom || 13,
+          zoomControl: false,
+          attributionControl: false,
+        });
+
+        // Add zoom control bottom right
+        L.control.zoom({ position: "bottomright" }).addTo(map);
+
+        // Dark Matter tiles from CartoDB
+        const tileUrl = mapStyle === "streets"
+          ? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+
+        ltileLayerRef.current = L.tileLayer(tileUrl, {
+          maxZoom: 19,
+          subdomains: "abcd",
+        }).addTo(map);
+
+        lmapInstanceRef.current = map;
+        setMapType("leaflet");
+        setMapReady(true);
+      } catch (e) {
+        console.error("Failed to initialize Leaflet fallback:", e);
+      }
+    };
+
+    // If Google Maps API key is defined and valid
+    if (apiKey && apiKey.trim() !== "" && apiKey !== "undefined" && apiKey.length > 10) {
+      loadGoogleMapsAPI(apiKey)
+        .then(() => {
+          if (!mapContainerRef.current) return;
+          const map = new (window as any).google.maps.Map(mapContainerRef.current, {
+            center: { lat: targetCityCoords.lat, lng: targetCityCoords.lng },
+            zoom: targetCityCoords.zoom || 13,
+            disableDefaultUI: true,
+            zoomControl: true,
+            zoomControlOptions: {
+              position: (window as any).google.maps.ControlPosition.RIGHT_BOTTOM,
+            },
+            styles: DARK_MAP_STYLES,
+            backgroundColor: "#0d121c",
+            gestureHandling: "greedy",
+          });
+
+          ginfoWindowRef.current = new (window as any).google.maps.InfoWindow({
+            disableAutoPan: false,
+          });
+
+          gmapInstanceRef.current = map;
+          setMapType("google");
+          setMapReady(true);
+        })
+        .catch(() => {
+          // Fall back to Leaflet on Google error
+          initLeaflet();
+        });
+    } else {
+      // Use Leaflet OpenStreetMap by default
+      initLeaflet();
     }
 
-    const bounds = new window.google.maps.LatLngBounds();
+    return () => {
+      if (lmapInstanceRef.current) {
+        lmapInstanceRef.current.remove();
+        lmapInstanceRef.current = null;
+      }
+      gmarkersRef.current.forEach((m) => m.setMap(null));
+      gmarkersRef.current = [];
+      gmapInstanceRef.current = null;
+      setMapReady(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    leadsWithCoords.forEach(({ lead, coords }) => {
-      const score = (lead.lead_score || "HIGH").toUpperCase();
-      const isSelected = selectedLead?.id === lead.id;
-      const isHigh = score === "HIGH";
-      const cleanName = (lead.business_name || "Lead").trim();
-      const shortName = cleanName.length > 20 ? cleanName.slice(0, 18) + "…" : cleanName;
+  // Update Leaflet tile style when mapStyle changes
+  useEffect(() => {
+    if (mapType === "leaflet" && lmapInstanceRef.current && (window as any).L) {
+      const L = (window as any).L;
+      if (ltileLayerRef.current) {
+        lmapInstanceRef.current.removeLayer(ltileLayerRef.current);
+      }
+      const tileUrl = mapStyle === "streets"
+        ? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
-      // Build custom SVG/HTML icon as a data URI
-      const label = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="170" height="36">
-          <defs>
-            <filter id="shadow">
-              <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="rgba(0,0,0,0.6)"/>
-            </filter>
-          </defs>
-          <rect rx="18" ry="18" width="170" height="28" fill="${isSelected ? "#0d131f" : "rgba(13,18,28,0.94)"}"
-            stroke="${isSelected ? "#AAFF00" : "rgba(255,255,255,0.18)"}" stroke-width="${isSelected ? 2 : 1.2}"
-            filter="url(#shadow)"/>
-          <circle cx="16" cy="14" r="4"
-            fill="${isHigh ? "#AAFF00" : "#64748b"}"
-            ${isHigh ? 'filter="url(#shadow)"' : ""}/>
-          <text x="26" y="19" font-family="system-ui,sans-serif" font-size="11" font-weight="700"
-            fill="#ffffff" dominant-baseline="middle">${shortName}${lead.rating ? ` ${lead.rating.toFixed(1)}★` : ""}</text>
-          <!-- caret -->
-          <polygon points="81,28 88,36 95,28" fill="${isSelected ? "#AAFF00" : "rgba(13,18,28,0.94)"}"/>
-        </svg>
-      `;
-
-      const svgBlob = new Blob([label], { type: "image/svg+xml" });
-      const url = URL.createObjectURL(svgBlob);
-
-      const marker = new window.google.maps.Marker({
-        position: { lat: coords.lat, lng: coords.lng },
-        map,
-        icon: {
-          url,
-          scaledSize: new window.google.maps.Size(170, 36),
-          anchor: new window.google.maps.Point(85, 36),
-        },
-        zIndex: isSelected ? 1000 : isHigh ? 500 : 100,
-        title: lead.business_name,
+      ltileLayerRef.current = L.tileLayer(tileUrl, { maxZoom: 19, subdomains: "abcd" }).addTo(lmapInstanceRef.current);
+    } else if (mapType === "google" && gmapInstanceRef.current && (window as any).google?.maps) {
+      gmapInstanceRef.current.setOptions({
+        styles: mapStyle === "dark" ? DARK_MAP_STYLES : [],
       });
+    }
+  }, [mapStyle, mapType]);
 
-      marker.addListener("click", () => {
-        onSelectLead(lead);
-        if (infoWindowRef.current) {
-          infoWindowRef.current.setContent(createInfoContent(lead));
-          infoWindowRef.current.open(map, marker);
+  // Render Markers for Leaflet and Google Maps
+  useEffect(() => {
+    if (!mapReady) return;
+
+    // ── LEAFLET MARKERS ──
+    if (mapType === "leaflet" && lmapInstanceRef.current && (window as any).L) {
+      const L = (window as any).L;
+      const map = lmapInstanceRef.current;
+
+      // Clear existing markers
+      lmarkersRef.current.forEach((m) => map.removeLayer(m));
+      lmarkersRef.current = [];
+
+      if (leadsWithCoords.length === 0) {
+        map.panTo([targetCityCoords.lat, targetCityCoords.lng]);
+        return;
+      }
+
+      const bounds = L.latLngBounds([]);
+
+      leadsWithCoords.forEach(({ lead, coords }) => {
+        const score = (lead.lead_score || "HIGH").toUpperCase();
+        const isSelected = selectedLead?.id === lead.id;
+        const isHigh = score === "HIGH";
+        const cleanName = (lead.business_name || "Lead").trim();
+        const shortName = cleanName.length > 18 ? cleanName.slice(0, 16) + "…" : cleanName;
+
+        const customIcon = L.divIcon({
+          className: "leaflet-lead-marker",
+          html: `
+            <div style="display:flex;align-items:center;gap:6px;background:${isSelected ? '#0d131f' : 'rgba(13,18,28,0.92)'};border:${isSelected ? '2px solid #AAFF00' : '1px solid rgba(255,255,255,0.18)'};border-radius:20px;padding:4px 10px;box-shadow:0 4px 12px rgba(0,0,0,0.6);white-space:nowrap;cursor:pointer;transform:translate(-50%,-100%);">
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${isHigh ? '#AAFF00' : '#94a3b8'};box-shadow:${isHigh ? '0 0 6px #AAFF00' : 'none'};"></span>
+              <span style="color:#ffffff;font-size:11px;font-weight:700;font-family:system-ui,sans-serif;">${shortName}${lead.rating ? ` ${lead.rating.toFixed(1)}★` : ''}</span>
+            </div>
+          `,
+          iconSize: [0, 0],
+        });
+
+        const marker = L.marker([coords.lat, coords.lng], { icon: customIcon }).addTo(map);
+
+        marker.bindPopup(createInfoContent(lead), {
+          className: "custom-leaflet-popup",
+          maxWidth: 300,
+        });
+
+        marker.on("click", () => {
+          onSelectLead(lead);
           setTimeout(() => {
             const btn = document.getElementById(`btn-view-lead-${lead.id}`);
             if (btn) btn.onclick = () => onSelectLead(lead);
           }, 80);
-        }
+        });
+
+        lmarkersRef.current.push(marker);
+        bounds.extend([coords.lat, coords.lng]);
       });
 
-      markersRef.current.push(marker);
-      bounds.extend({ lat: coords.lat, lng: coords.lng });
-    });
-
-    // Auto-fit on new batches
-    if (Math.abs(leadsWithCoords.length - lastFittedCountRef.current) >= 4) {
-      lastFittedCountRef.current = leadsWithCoords.length;
-      map.fitBounds(bounds, 60);
+      if (Math.abs(leadsWithCoords.length - lastFittedCountRef.current) >= 4) {
+        lastFittedCountRef.current = leadsWithCoords.length;
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
     }
-  }, [leadsWithCoords, selectedLead, mapReady, onSelectLead, createInfoContent, targetCityCoords]);
 
-  // Pan to selected lead
-  useEffect(() => {
-    if (!selectedLead || !mapReady || !mapInstanceRef.current) return;
-    const coords = getLeadCoordinates(selectedLead, targetCityCoords);
-    mapInstanceRef.current.panTo({ lat: coords.lat, lng: coords.lng });
-    mapInstanceRef.current.setZoom(15);
-  }, [selectedLead, mapReady, targetCityCoords]);
+    // ── GOOGLE MAPS MARKERS ──
+    if (mapType === "google" && gmapInstanceRef.current && (window as any).google?.maps) {
+      const map = gmapInstanceRef.current;
+      gmarkersRef.current.forEach((m) => m.setMap(null));
+      gmarkersRef.current = [];
 
+      if (leadsWithCoords.length === 0) {
+        map.panTo({ lat: targetCityCoords.lat, lng: targetCityCoords.lng });
+        return;
+      }
+
+      const bounds = new (window as any).google.maps.LatLngBounds();
+
+      leadsWithCoords.forEach(({ lead, coords }) => {
+        const score = (lead.lead_score || "HIGH").toUpperCase();
+        const isSelected = selectedLead?.id === lead.id;
+        const isHigh = score === "HIGH";
+        const cleanName = (lead.business_name || "Lead").trim();
+        const shortName = cleanName.length > 20 ? cleanName.slice(0, 18) + "…" : cleanName;
+
+        const label = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="170" height="36">
+            <defs>
+              <filter id="shadow">
+                <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="rgba(0,0,0,0.6)"/>
+              </filter>
+            </defs>
+            <rect rx="18" ry="18" width="170" height="28" fill="${isSelected ? "#0d131f" : "rgba(13,18,28,0.94)"}"
+              stroke="${isSelected ? "#AAFF00" : "rgba(255,255,255,0.18)"}" stroke-width="${isSelected ? 2 : 1.2}"
+              filter="url(#shadow)"/>
+            <circle cx="16" cy="14" r="4"
+              fill="${isHigh ? "#AAFF00" : "#64748b"}"
+              ${isHigh ? 'filter="url(#shadow)"' : ""}/>
+            <text x="26" y="19" font-family="system-ui,sans-serif" font-size="11" font-weight="700"
+              fill="#ffffff" dominant-baseline="middle">${shortName}${lead.rating ? ` ${lead.rating.toFixed(1)}★` : ""}</text>
+            <polygon points="81,28 88,36 95,28" fill="${isSelected ? "#AAFF00" : "rgba(13,18,28,0.94)"}"/>
+          </svg>
+        `;
+
+        const svgBlob = new Blob([label], { type: "image/svg+xml" });
+        const url = URL.createObjectURL(svgBlob);
+
+        const marker = new (window as any).google.maps.Marker({
+          position: { lat: coords.lat, lng: coords.lng },
+          map,
+          icon: {
+            url,
+            scaledSize: new (window as any).google.maps.Size(170, 36),
+            anchor: new (window as any).google.maps.Point(85, 36),
+          },
+          zIndex: isSelected ? 1000 : isHigh ? 500 : 100,
+          title: lead.business_name,
+        });
+
+        marker.addListener("click", () => {
+          onSelectLead(lead);
+          if (ginfoWindowRef.current) {
+            ginfoWindowRef.current.setContent(createInfoContent(lead));
+            ginfoWindowRef.current.open(map, marker);
+            setTimeout(() => {
+              const btn = document.getElementById(`btn-view-lead-${lead.id}`);
+              if (btn) btn.onclick = () => onSelectLead(lead);
+            }, 80);
+          }
+        });
+
+        gmarkersRef.current.push(marker);
+        bounds.extend({ lat: coords.lat, lng: coords.lng });
+      });
+
+      if (Math.abs(leadsWithCoords.length - lastFittedCountRef.current) >= 4) {
+        lastFittedCountRef.current = leadsWithCoords.length;
+        map.fitBounds(bounds, 60);
+      }
+    }
+  }, [leadsWithCoords, selectedLead, mapReady, mapType, onSelectLead, createInfoContent, targetCityCoords]);
+
+  // Recenter map
   const handleRecenter = () => {
-    if (!mapReady || !mapInstanceRef.current || !window.google?.maps) return;
-    if (leadsWithCoords.length > 0) {
-      const bounds = new window.google.maps.LatLngBounds();
-      leadsWithCoords.forEach(({ coords }) => bounds.extend({ lat: coords.lat, lng: coords.lng }));
-      mapInstanceRef.current.fitBounds(bounds, 60);
-    } else {
-      mapInstanceRef.current.panTo({ lat: targetCityCoords.lat, lng: targetCityCoords.lng });
-      mapInstanceRef.current.setZoom(targetCityCoords.zoom || 13);
+    if (!mapReady) return;
+    if (mapType === "leaflet" && lmapInstanceRef.current && (window as any).L) {
+      if (leadsWithCoords.length > 0) {
+        const L = (window as any).L;
+        const bounds = L.latLngBounds([]);
+        leadsWithCoords.forEach(({ coords }) => bounds.extend([coords.lat, coords.lng]));
+        lmapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+      } else {
+        lmapInstanceRef.current.setView([targetCityCoords.lat, targetCityCoords.lng], targetCityCoords.zoom || 13);
+      }
+    } else if (mapType === "google" && gmapInstanceRef.current && (window as any).google?.maps) {
+      if (leadsWithCoords.length > 0) {
+        const bounds = new (window as any).google.maps.LatLngBounds();
+        leadsWithCoords.forEach(({ coords }) => bounds.extend({ lat: coords.lat, lng: coords.lng }));
+        gmapInstanceRef.current.fitBounds(bounds, 60);
+      } else {
+        gmapInstanceRef.current.panTo({ lat: targetCityCoords.lat, lng: targetCityCoords.lng });
+        gmapInstanceRef.current.setZoom(targetCityCoords.zoom || 13);
+      }
     }
   };
 
@@ -391,17 +523,7 @@ export function BusinessMap({
         </div>
       </div>
 
-      {/* Load error fallback */}
-      {loadError && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#0a0d14]">
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">Map failed to load.</p>
-            <p className="text-xs text-muted-foreground mt-1">Check your Google Maps API key.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Google Map canvas */}
+      {/* Map canvas */}
       <div ref={mapContainerRef} className="w-full h-full" style={{ zIndex: 1 }} />
 
       {/* Scanning indicator */}

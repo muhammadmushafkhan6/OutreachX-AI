@@ -165,9 +165,9 @@ export function BusinessMap({
         ${lead.category ? `<p style="font-size:10px;color:#94a3b8;margin:0 0 8px 0;">${lead.category}</p>` : ""}
         <div style="padding:6px 0;border-top:1px solid rgba(255,255,255,0.08);border-bottom:1px solid rgba(255,255,255,0.08);margin:6px 0;font-size:11px;">
           ${hasWebsite
-            ? `<div style="display:flex;align-items:center;gap:6px;color:#e2e8f0;margin-bottom:3px;"><span>🌐</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">${lead.website!.replace(/^https?:\/\//, "")}</span></div>`
-            : `<div style="display:flex;align-items:center;gap:6px;color:#f87171;margin-bottom:3px;"><span>⚠️</span><span style="font-weight:600;">No Website Found</span></div>`
-          }
+        ? `<div style="display:flex;align-items:center;gap:6px;color:#e2e8f0;margin-bottom:3px;"><span>🌐</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">${lead.website!.replace(/^https?:\/\//, "")}</span></div>`
+        : `<div style="display:flex;align-items:center;gap:6px;color:#f87171;margin-bottom:3px;"><span>⚠️</span><span style="font-weight:600;">No Website Found</span></div>`
+      }
           ${email ? `<div style="display:flex;align-items:center;gap:6px;color:#cbd5e1;margin-bottom:3px;"><span>✉️</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;">${email}</span></div>` : ""}
           ${phone ? `<div style="display:flex;align-items:center;gap:6px;color:#94a3b8;"><span>📞</span><span>${phone}</span></div>` : ""}
         </div>
@@ -185,7 +185,7 @@ export function BusinessMap({
   // Initialize Map Engine (Google if valid key, else OpenStreetMap / Leaflet)
   useEffect(() => {
     if (!mapContainerRef.current) return;
-    const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string;
+    const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || "AIzaSyD4u36S67CcSBjxgwF1jCOJg7UuAeF0zsw";
 
     const initLeaflet = async () => {
       try {
@@ -458,9 +458,8 @@ export function BusinessMap({
 
   return (
     <div
-      className={`relative rounded-[2rem] border border-white/10 bg-[#0a0d14] overflow-hidden shadow-2xl transition-all duration-300 ${
-        isFullscreen ? "fixed inset-4 z-50 rounded-2xl h-[calc(100vh-2rem)]" : "w-full h-[580px] lg:h-[640px]"
-      }`}
+      className={`relative rounded-[2rem] border border-white/10 bg-[#0a0d14] overflow-hidden shadow-2xl transition-all duration-300 ${isFullscreen ? "fixed inset-4 z-50 rounded-2xl h-[calc(100vh-2rem)]" : "w-full h-[580px] lg:h-[640px]"
+        }`}
     >
       {/* Toolbar */}
       <div className="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 pointer-events-none">
@@ -483,11 +482,10 @@ export function BusinessMap({
               <button
                 key={f.id}
                 onClick={() => setFilter(f.id)}
-                className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${
-                  filter === f.id
+                className={`px-3 py-1 text-xs font-semibold rounded-full transition-all ${filter === f.id
                     ? "bg-white/10 text-foreground border border-white/15 font-bold shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
-                }`}
+                  }`}
               >
                 {f.label}
               </button>
